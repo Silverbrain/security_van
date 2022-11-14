@@ -153,8 +153,8 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
     score. At the end it returns the Populatoin after 10,000 generation.
     '''
     stats = {
-        'fitness_mean' : [],
-        'fitness_std' : [],
+        'best_fit' : 0,
+        'best_fit_duration' : 0,
     }
 
     generation = 0
@@ -162,9 +162,11 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
     fit_scores = fitness_population(Population)
     generation += len(Population)
     while generation < 10000:
-        if testing:
-            stats['fitness_mean'].append(np.mean(fit_scores))
-            stats['fitness_std'].append(np.std(fit_scores))
+        if stats['best_fit_duration'] >= 100:
+            break
+        # if testing:
+        #     stats['fitness_mean'].append(np.mean(fit_scores))
+        #     stats['fitness_std'].append(np.std(fit_scores))
 
         #using tournament selection twice to ditermine the two parents
         parent_A_idx = tournament_selection(fit_scores, t_size)
@@ -179,8 +181,15 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
         Population = weakest_replace(Population, fit_scores, E)
         Population = weakest_replace(Population, fit_scores, F)
         generation += 2
+
+        if np.max(fit_scores) > stats['best_fit']:
+            stats['best_fit'] = np.max(fit_scores)
+            stats['best_fit_duration'] = 0
+        else:
+            stats['best_fit_duration'] += 1
+
     
-    return Population, fit_scores, stats
+    return Population, fit_scores, generation
 
 t0 = time.time()    #setting the starting time to calculate the total runing time of the program
 
@@ -197,7 +206,7 @@ wght_limit = 285.0 #weghit limit of the van; specified in the input file.
 result_file_name = 'results.csv'
 with open(result_file_name, 'w') as res_file:
     #if the program is testing the algorithm set True. Set False to evaluate the algorithm
-    testing = True
+    testing = False
     
     if testing:
         ### trial variables
@@ -208,13 +217,13 @@ with open(result_file_name, 'w') as res_file:
     else:
         ### trial variables
         p_size = np.arange(10, 201, 10)       # initial population size
-        #t_size = [np.arange(2, x / 2, 1, dtype = int) for x in p_size] # number of solutions that would be selected for tournament
-        t_size = np.arange(2, 6, 1)           # number of solutions that would be selected for tournament
+        t_size = [[2, int(0.25 * x), int(0.5 * x), int(0.75 * x), x - 1] for x in p_size] # number of solutions that would be selected for tournament
+        #t_size = np.arange(2, 6, 1)           # number of solutions that would be selected for tournament
         m_rate = np.arange(1, 11, 1)          # number of times the mutation process applies to a solution
         random_seed_pool = range(5)
 
         #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness','runing_duration']
-        columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'fit_mean', 'fit_std','runing_duration']
+        columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
         csv_wrt = csv.writer(res_file)
         csv_wrt.writerow(columns)
     
@@ -225,8 +234,8 @@ with open(result_file_name, 'w') as res_file:
     '''
     runstats = []
     for p_idx, p in enumerate(p_size):
-        #for t in t_size[p_idx]:
-        for t in t_size:
+        for t in t_size[p_idx]:
+        #for t in t_size:
             for m in m_rate:
                 for s in random_seed_pool:
                     ts = time.time()
@@ -238,7 +247,7 @@ with open(result_file_name, 'w') as res_file:
                     Population = np.random.binomial(1, 0.5, (p ,len(bag_val)))
 
                     #Runing the evolutionary algorithm on the population
-                    Population, fit_scores, stats = EA(Population, t, m, testing)
+                    Population, fit_scores, convergence = EA(Population, t, m, testing)
 
                     for i in range(len(fit_scores)):
                         idx = np.argmax(fit_scores)
@@ -249,27 +258,27 @@ with open(result_file_name, 'w') as res_file:
                     tf = time.time()
 
                     if(fit_scores[idx] > 0):
-                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), np.mean(fit_scores).round(4), np.std(fit_scores).round(4),(tf - ts)]
+                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)]
                         print(data, 'elapsed: {}'.format((tf - t0)))
                         if not testing:
                             csv_wrt.writerow(data)
                         else:
-                            runstats.append(stats)
+                            runstats.append(convergence)
                     else:
                         print('No valid solution has been found!')
 
-if testing:
-    gs = gridspec.GridSpec(2, 2)
-    for stat in runstats:
-        ax1 = plt.subplot(gs[0, 0])
-        ax1.scatter(np.arange(0, len(stat['fitness_mean'])) , stat['fitness_mean'])
-        ax2 = plt.subplot(gs[0, 1])
-        ax2.scatter(np.arange(0, len(stat['fitness_std'])) , stat['fitness_std'])
-        ax3 = plt.subplot(gs[1, :])
-        ax3.scatter(stat['fitness_mean'], stat['fitness_std'])
-        ax3.set_xscale('log')
-        ax3.set_yscale('log')
-    #plt.show()
+# if testing:
+#     gs = gridspec.GridSpec(2, 2)
+#     for stat in runstats:
+#         ax1 = plt.subplot(gs[0, 0])
+#         ax1.scatter(np.arange(0, len(stat['fitness_mean'])) , stat['fitness_mean'])
+#         ax2 = plt.subplot(gs[0, 1])
+#         ax2.scatter(np.arange(0, len(stat['fitness_std'])) , stat['fitness_std'])
+#         ax3 = plt.subplot(gs[1, :])
+#         ax3.scatter(stat['fitness_mean'], stat['fitness_std'])
+#         ax3.set_xscale('log')
+#         ax3.set_yscale('log')
+#     #plt.show()
 
 t1 = time.time()
 print(f'Total execution time: {round((t1 - t0), 2)}s')
