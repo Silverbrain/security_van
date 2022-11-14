@@ -152,21 +152,17 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
     algorithm 10,000 times. The goal of the function is to maximise the fitness
     score. At the end it returns the Populatoin after 10,000 generation.
     '''
-    stats = {
-        'best_fit' : 0,
-        'best_fit_duration' : 0,
-    }
-
+    best_fit = 0
+    best_fit_duration = 0
     generation = 0
+
     #saving the fitness value for each solution in a vector.
     fit_scores = fitness_population(Population)
     generation += len(Population)
+
     while generation < 10000:
-        if stats['best_fit_duration'] >= 100:
+        if best_fit_duration >= 100:
             break
-        # if testing:
-        #     stats['fitness_mean'].append(np.mean(fit_scores))
-        #     stats['fitness_std'].append(np.std(fit_scores))
 
         #using tournament selection twice to ditermine the two parents
         parent_A_idx = tournament_selection(fit_scores, t_size)
@@ -182,11 +178,11 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
         Population = weakest_replace(Population, fit_scores, F)
         generation += 2
 
-        if np.max(fit_scores) > stats['best_fit']:
-            stats['best_fit'] = np.max(fit_scores)
-            stats['best_fit_duration'] = 0
+        if np.max(fit_scores) > best_fit:
+            best_fit = np.max(fit_scores)
+            best_fit_duration = 0
         else:
-            stats['best_fit_duration'] += 1
+            best_fit_duration += 1
 
     
     return Population, fit_scores, generation
@@ -199,10 +195,6 @@ bag_val, bag_wght = read_input_file('BankProblem.txt')
 
 wght_limit = 285.0 #weghit limit of the van; specified in the input file.
 
-
-# p_size = np.arange(10, 501, 10)        # initial population size
-# t_size = [] # number of solutions that would be selected for tournament
-# m_rate = np.arange(1, 50, 1)          # number of times the mutation process applies to a solution
 result_file_name = 'results.csv'
 with open(result_file_name, 'w') as res_file:
     #if the program is testing the algorithm set True. Set False to evaluate the algorithm
@@ -211,18 +203,17 @@ with open(result_file_name, 'w') as res_file:
     if testing:
         ### trial variables
         p_size = [10, 50, 100, 150, 200]        # initial population size
-        t_size = [5]         # number of solutions that would be selected for tournament
-        m_rate = [3]         # number of times the mutation process applies to a solution
-        random_seed_pool = [0]
+        t_size = [5]                # number of solutions that would be selected for tournament
+        m_rate = [3]                # number of times the mutation process applies to a solution
+        random_seed_pool = [0]      # list of fixed number to be used as seed for the random seed.
     else:
         ### trial variables
         p_size = np.arange(10, 201, 10)       # initial population size
         t_size = [[2, int(0.25 * x), int(0.5 * x), int(0.75 * x), x - 1] for x in p_size] # number of solutions that would be selected for tournament
-        #t_size = np.arange(2, 6, 1)           # number of solutions that would be selected for tournament
-        m_rate = np.arange(1, 11, 1)          # number of times the mutation process applies to a solution
-        random_seed_pool = range(5)
+        #m_rate = np.arange(1, 11, 1)          # number of times the mutation process applies to a solution
+        m_rate = [np.arange(1, int(0.3 * p_size), 1) for x in p_size]
+        random_seed_pool = range(5)           # list of fixed number to be used as seed for the random seed.
 
-        #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness','runing_duration']
         columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
         csv_wrt = csv.writer(res_file)
         csv_wrt.writerow(columns)
@@ -236,7 +227,7 @@ with open(result_file_name, 'w') as res_file:
     for p_idx, p in enumerate(p_size):
         for t in t_size[p_idx]:
         #for t in t_size:
-            for m in m_rate:
+            for m in m_rate[p_id]:
                 for s in random_seed_pool:
                     ts = time.time()
 
@@ -258,27 +249,13 @@ with open(result_file_name, 'w') as res_file:
                     tf = time.time()
 
                     if(fit_scores[idx] > 0):
+                        #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
                         data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)]
                         print(data, 'elapsed: {}'.format((tf - t0)))
                         if not testing:
                             csv_wrt.writerow(data)
-                        else:
-                            runstats.append(convergence)
                     else:
                         print('No valid solution has been found!')
-
-# if testing:
-#     gs = gridspec.GridSpec(2, 2)
-#     for stat in runstats:
-#         ax1 = plt.subplot(gs[0, 0])
-#         ax1.scatter(np.arange(0, len(stat['fitness_mean'])) , stat['fitness_mean'])
-#         ax2 = plt.subplot(gs[0, 1])
-#         ax2.scatter(np.arange(0, len(stat['fitness_std'])) , stat['fitness_std'])
-#         ax3 = plt.subplot(gs[1, :])
-#         ax3.scatter(stat['fitness_mean'], stat['fitness_std'])
-#         ax3.set_xscale('log')
-#         ax3.set_yscale('log')
-#     #plt.show()
 
 t1 = time.time()
 print(f'Total execution time: {round((t1 - t0), 2)}s')
