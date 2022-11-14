@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import seaborn as sb
 import csv
+import threading
 
 def read_input_file(input_file_name: str) -> tuple[np.ndarray, np.ndarray]:
     '''
@@ -182,6 +183,38 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
     
     return Population, fit_scores, stats
 
+def run(p, t, m, testing):
+    seeds = range(5)
+    for s in seeds:
+        np.random.seed(s) 
+        ts = time.time()
+
+        #setting the value of random seed to get the same initial population every time for comparison purposes.
+
+        #generating the initial population.
+        Population = np.random.binomial(1, 0.5, (p ,len(bag_val)))
+
+        #Runing the evolutionary algorithm on the population
+        Population, fit_scores, stats = EA(Population, t, m, testing)
+
+        for i in range(len(fit_scores)):
+            idx = np.argmax(fit_scores)
+            sol = Population[idx]
+            if np.sum(sol * bag_wght) > wght_limit:
+                fit_scores[idx] = -1
+
+        tf = time.time()
+
+        if(fit_scores[idx] > 0):
+            data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), np.mean(fit_scores).round(4), np.std(fit_scores).round(4),(tf - ts)]
+            print(data, 'elapsed: {}'.format((tf - t0)))
+            if not testing:
+                csv_wrt.writerow(data)
+            else:
+                runstats.append(stats)
+        else:
+            print('No valid solution has been found!')
+
 t0 = time.time()    #setting the starting time to calculate the total runing time of the program
 
 # The next two variables are the lists of the weights and values of the bags in input file.
@@ -217,7 +250,7 @@ with open(result_file_name, 'w') as res_file:
         columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'fit_mean', 'fit_std','runing_duration']
         csv_wrt = csv.writer(res_file)
         csv_wrt.writerow(columns)
-    
+
     '''
     In case of testing, the algorithm will run with one setting
     otherwise it will run for each setting and saves the statistics
@@ -228,35 +261,40 @@ with open(result_file_name, 'w') as res_file:
         #for t in t_size[p_idx]:
         for t in t_size:
             for m in m_rate:
-                for s in random_seed_pool:
-                    ts = time.time()
+                #for s in random_seed_pool:
+                    #run(p, t, m, s, testing)
+                t = threading.Thread(target= run, args=(p, t, m, testing))
+                t.start()
+                #t.join()
+                #print('test')
+                    # ts = time.time()
 
-                    #setting the value of random seed to get the same initial population every time for comparison purposes.
-                    np.random.seed(s) 
+                    # #setting the value of random seed to get the same initial population every time for comparison purposes.
+                    # np.random.seed(s) 
 
-                    #generating the initial population.
-                    Population = np.random.binomial(1, 0.5, (p ,len(bag_val)))
+                    # #generating the initial population.
+                    # Population = np.random.binomial(1, 0.5, (p ,len(bag_val)))
 
-                    #Runing the evolutionary algorithm on the population
-                    Population, fit_scores, stats = EA(Population, t, m, testing)
+                    # #Runing the evolutionary algorithm on the population
+                    # Population, fit_scores, stats = EA(Population, t, m, testing)
 
-                    for i in range(len(fit_scores)):
-                        idx = np.argmax(fit_scores)
-                        sol = Population[idx]
-                        if np.sum(sol * bag_wght) > wght_limit:
-                            fit_scores[idx] = -1
+                    # for i in range(len(fit_scores)):
+                    #     idx = np.argmax(fit_scores)
+                    #     sol = Population[idx]
+                    #     if np.sum(sol * bag_wght) > wght_limit:
+                    #         fit_scores[idx] = -1
 
-                    tf = time.time()
+                    # tf = time.time()
 
-                    if(fit_scores[idx] > 0):
-                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), np.mean(fit_scores).round(4), np.std(fit_scores).round(4),(tf - ts)]
-                        print(data, 'elapsed: {}'.format((tf - t0)))
-                        if not testing:
-                            csv_wrt.writerow(data)
-                        else:
-                            runstats.append(stats)
-                    else:
-                        print('No valid solution has been found!')
+                    # if(fit_scores[idx] > 0):
+                    #     data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), np.mean(fit_scores).round(4), np.std(fit_scores).round(4),(tf - ts)]
+                    #     print(data, 'elapsed: {}'.format((tf - t0)))
+                    #     if not testing:
+                    #         csv_wrt.writerow(data)
+                    #     else:
+                    #         runstats.append(stats)
+                    # else:
+                    #     print('No valid solution has been found!')
 
 if testing:
     gs = gridspec.GridSpec(2, 2)
@@ -270,6 +308,11 @@ if testing:
         ax3.set_xscale('log')
         ax3.set_yscale('log')
     #plt.show()
+
+for thrd in threading.enumerate():
+    if thrd.ident == threading.currentThread().ident:
+        continue
+    thrd.join()
 
 t1 = time.time()
 print(f'Total execution time: {round((t1 - t0), 2)}s')
