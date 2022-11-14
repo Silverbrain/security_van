@@ -211,7 +211,7 @@ with open(result_file_name, 'w') as res_file:
         p_size = np.arange(10, 201, 10)       # initial population size
         t_size = [[2, int(0.25 * x), int(0.5 * x), int(0.75 * x), x - 1] for x in p_size] # number of solutions that would be selected for tournament
         #m_rate = np.arange(1, 11, 1)          # number of times the mutation process applies to a solution
-        m_rate = [np.arange(1, int(0.3 * p_size), 1) for x in p_size]
+        m_rate = [np.arange(1, int(0.3 * x), 1) for x in p_size]
         random_seed_pool = range(5)           # list of fixed number to be used as seed for the random seed.
 
         columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
@@ -227,7 +227,7 @@ with open(result_file_name, 'w') as res_file:
     for p_idx, p in enumerate(p_size):
         for t in t_size[p_idx]:
         #for t in t_size:
-            for m in m_rate[p_id]:
+            for m in m_rate[p_idx]:
                 for s in random_seed_pool:
                     ts = time.time()
 
