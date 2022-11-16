@@ -11,10 +11,6 @@ def read_input_file(input_file_name: str) -> tuple[np.ndarray, np.ndarray]:
     '''
     read_input_file will take a string as input which is the name of the input file
     and returns a tuple of two arrays containing value and weight of the bags.
-
-    To formulate the problem, we first need to get the input file containing the information about the bags and the van's weight limit. The data formation is JSON-like, containing 100 bags, and each has two properties; value and weight. For simplicity, we can store the value and weight of the bags in separate lists and use the list index as the bag number (i.e. $val[0]$ refers to the value of the first bag).
-
-    We read the input file line by line and check if each line contains a ``weight" or ``value" string. If so, then we split the line by `:' delimiter and add the second element of the returned list by split function to the correct list. Finally, we turn the list into `$NumPy$' arrays so we can work with it easier and faster.
     '''
     
     bag_wght = []
@@ -150,7 +146,7 @@ def weakest_replace(population : np.ndarray, fit_scores : np.ndarray, new_child 
     
     return population
 
-def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = False) -> np.ndarray:
+def EA(Population: np.ndarray, t_size : int, m_rate : int) -> np.ndarray:
     '''
     EA "Evolutionary Algorithm" takes an initial population and performs the
     algorithm 10,000 times. The goal of the function is to maximise the fitness
@@ -173,8 +169,9 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
         parent_B_idx = tournament_selection(fit_scores, t_size)
 
         #Run crossover function on the selected parents
-        C, D = crossover(Population[parent_A_idx], Population[parent_B_idx])
-
+        #C, D = crossover(Population[parent_A_idx], Population[parent_B_idx])
+        C, D = Population[parent_A_idx], Population[parent_B_idx]
+        
         #Run mutation on the C and D to get the new solutions
         E, F = Mutate(C, m_rate), Mutate(D, m_rate)
 
@@ -199,17 +196,20 @@ bag_val, bag_wght = read_input_file('BankProblem.txt')
 
 wght_limit = 285.0 #weghit limit of the van; specified in the input file.
 
-result_file_name = 'results.csv'
+result_file_name = 'results_p_100.csv'
 with open(result_file_name, 'w') as res_file:
     #if the program is testing the algorithm set True. Set False to evaluate the algorithm
-    testing = False
+    testing = True
     
     if testing:
         ### trial variables
-        p_size = [10, 50, 100, 150, 200]        # initial population size
-        t_size = [5]                # number of solutions that would be selected for tournament
-        m_rate = [3]                # number of times the mutation process applies to a solution
-        random_seed_pool = [0]      # list of fixed number to be used as seed for the random seed.
+        p_size = 100        # initial population size
+        t_size = 9                # number of solutions that would be selected for tournament
+        #m_rate = [3]                # number of times the mutation process applies to a solution
+        random_seed_pool = range(1000)      # list of fixed number to be used as seed for the random seed.
+        columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
+        csv_wrt = csv.writer(res_file)
+        csv_wrt.writerow(columns)
     else:
         ### trial variables
         p_size = np.arange(10, 201, 10)       # initial population size
@@ -228,41 +228,38 @@ with open(result_file_name, 'w') as res_file:
     of each run in a CSV file.
     '''
     runstats = []
-    for p_idx, p in enumerate(p_size):
-        for t in t_size[p_idx]:
-        #for t in t_size:
-            for m in m_rate[p_idx]:
-                for s in random_seed_pool:
-                    ts = time.time()
+    # for p_idx, p in enumerate(p_size):
+    #     for t in t_size[p_idx]:
+    #     #for t in t_size:
+    #         for m in m_rate[p_idx]:
+    for s in random_seed_pool:
+        ts = time.time()
 
-                    #setting the value of random seed to get the same initial population every time for comparison purposes.
-                    np.random.seed(s) 
+        #setting the value of random seed to get the same initial population every time for comparison purposes.
+        np.random.seed(s) 
 
+        #generating the initial population.
+        Population = np.random.binomial(1, 0.5, (p_size ,len(bag_val)))
 
-                    '''The next step after reading the input file is to develop a way of presenting the solutions. For that matter, we will create a matrix of zeros and ones. For the initial population, we are using the NumPy `$random.binomial$` function, which yields a random array of `$zeros$' and `$ones$' with the shape `\emph{p\_size $\times$ len(bags)}'. Each row of the array represents a solution, and each column corresponds to whether a certain bag exists in the solution. `$zero$' means the corresponding bag does not exist in the solution, and `$one$' specifies otherwise.
-                    '''
-                    #generating the initial population.
-                    Population = np.random.binomial(1, 0.5, (p ,len(bag_val)))
+        #Runing the evolutionary algorithm on the population
+        Population, fit_scores, convergence = EA(Population, t_size, 1)
 
-                    #Runing the evolutionary algorithm on the population
-                    Population, fit_scores, convergence = EA(Population, t, m, testing)
+        for i in range(len(fit_scores)):
+            idx = np.argmax(fit_scores)
+            sol = Population[idx]
+            if np.sum(sol * bag_wght) > wght_limit:
+                fit_scores[idx] = -1
 
-                    for i in range(len(fit_scores)):
-                        idx = np.argmax(fit_scores)
-                        sol = Population[idx]
-                        if np.sum(sol * bag_wght) > wght_limit:
-                            fit_scores[idx] = -1
+        tf = time.time()
 
-                    tf = time.time()
-
-                    if(fit_scores[idx] > 0):
-                        #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
-                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)]
-                        print(data, 'elapsed: {}'.format((tf - t0)))
-                        if not testing:
-                            csv_wrt.writerow(data)
-                    else:
-                        print('No valid solution has been found!')
+        if(fit_scores[idx] > 0):
+            #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
+            data = [p_size, t_size, 0, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)]
+            print(data, 'elapsed: {}'.format((tf - t0)))
+            #if not testing:
+            csv_wrt.writerow(data)
+        else:
+            print('No valid solution has been found!')
 
 t1 = time.time()
 print(f'Total execution time: {round((t1 - t0), 2)}s')
