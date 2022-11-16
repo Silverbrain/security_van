@@ -1,10 +1,6 @@
 from operator import contains
 import numpy as np
 import time
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import seaborn as sb
 import csv
 
 def read_input_file(input_file_name: str) -> tuple[np.ndarray, np.ndarray]:
@@ -117,8 +113,8 @@ def Mutate(child : list, mutation_rate : int) -> list:
     '''
     
     for i in range(mutation_rate):
-        m_idx = np.random.randint(0, len(child))
-        child[m_idx] = not child[m_idx]
+        m_idx = np.random.randint(0, len(child)) # choosing the indices where the mutations will accure.
+        child[m_idx] = not child[m_idx] # fliping the genom 
     
     return child
 
@@ -165,6 +161,7 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
     generation += len(Population)
 
     while generation < 10000:
+        # if the fittest hasn't changed after 100 iterations, converge!
         if best_fit_duration >= 100:
             break
 
@@ -178,10 +175,12 @@ def EA(Population: np.ndarray, t_size : int, m_rate : int, testing : bool = Fals
         #Run mutation on the C and D to get the new solutions
         E, F = Mutate(C, m_rate), Mutate(D, m_rate)
 
+        #Replacing the worst solutions with the new children
         Population = weakest_replace(Population, fit_scores, E)
         Population = weakest_replace(Population, fit_scores, F)
         generation += 2
 
+        #checking whether the fittest changed 
         if np.max(fit_scores) > best_fit:
             best_fit = np.max(fit_scores)
             best_fit_duration = 0
@@ -204,6 +203,10 @@ with open(result_file_name, 'w') as res_file:
     #if the program is testing the algorithm set True. Set False to evaluate the algorithm
     testing = False
     
+    columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
+    csv_wrt = csv.writer(res_file)
+    csv_wrt.writerow(columns)
+
     if testing:
         ### trial variables
         p_size = [10, 50, 100, 150, 200]        # initial population size
@@ -214,13 +217,9 @@ with open(result_file_name, 'w') as res_file:
         ### trial variables
         p_size = np.arange(10, 201, 10)       # initial population size
         t_size = [[2, int(0.25 * x), int(0.5 * x), int(0.75 * x), x - 1] for x in p_size] # number of solutions that would be selected for tournament
-        #m_rate = np.arange(1, 11, 1)          # number of times the mutation process applies to a solution
         m_rate = [np.arange(1, int(0.3 * x), 1) for x in p_size]
         random_seed_pool = range(5)           # list of fixed number to be used as seed for the random seed.
 
-        columns = ['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
-        csv_wrt = csv.writer(res_file)
-        csv_wrt.writerow(columns)
     
     '''
     In case of testing, the algorithm will run with one setting
@@ -233,7 +232,7 @@ with open(result_file_name, 'w') as res_file:
         #for t in t_size:
             for m in m_rate[p_idx]:
                 for s in random_seed_pool:
-                    ts = time.time()
+                    ts = time.time() #starting time of this lap
 
                     #setting the value of random seed to get the same initial population every time for comparison purposes.
                     np.random.seed(s) 
@@ -247,22 +246,23 @@ with open(result_file_name, 'w') as res_file:
                     #Runing the evolutionary algorithm on the population
                     Population, fit_scores, convergence = EA(Population, t, m, testing)
 
+                    #eliminating invalid solutions. 
                     for i in range(len(fit_scores)):
-                        idx = np.argmax(fit_scores)
-                        sol = Population[idx]
+                        idx = np.argmax(fit_scores) #finding the index of the highest fitness 
+                        sol = Population[idx] #fetching the solution with highest fitness
                         if np.sum(sol * bag_wght) > wght_limit:
                             fit_scores[idx] = -1
 
-                    tf = time.time()
+                    tf = time.time() #finishing time of this lap
 
+                    # checking whether there is any valid solution in the population 
                     if(fit_scores[idx] > 0):
                         #['population_size', 'tournament_size', 'mutation_rate', 'lap', 'value', 'weight', 'fitness', 'convergence_gen','runing_duration']
-                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)]
+                        data = [p, t, m, s,np.sum(sol * bag_val), np.sum(sol * bag_wght).round(1), fit_scores[idx].round(4), convergence,(tf - ts)] #capturing the execution parameters.
                         print(data, 'elapsed: {}'.format((tf - t0)))
-                        if not testing:
-                            csv_wrt.writerow(data)
+                        csv_wrt.writerow(data) #wrting the parameters to the csv file.
                     else:
                         print('No valid solution has been found!')
 
-t1 = time.time()
+t1 = time.time() #finishing time of the program
 print(f'Total execution time: {round((t1 - t0), 2)}s')
